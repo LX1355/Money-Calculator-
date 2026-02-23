@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>محفظة المتقدمة - سحابي</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-database-compat.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: #27ae60;
+            --bg-color: #f4f7f6;
+            --danger-color: #e74c3c;
+            --accent-color: #2980b9;
+            --warning-color: #f39c12;
+        }
+        
+        * { font-family: 'Cairo', 'Segoe UI', Tahoma, sans-serif; }
+
+        body {
+            background-color: var(--bg-color);
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; margin: 0; touch-action: manipulation;
+        }
+
+        /* --- التعديلات الجديدة CSS --- */
+        @keyframes blink-alert { 50% { opacity: 0; } }
+        .alert-exclamation { 
+            animation: blink-alert 1s infinite; 
+            color: red; 
+            font-weight: bold; 
+            margin-right: 8px; /* تم التعديل ليكون الهامش من اليمين */
+            display: none; 
+        }
+        .faded-request { 
+            opacity: 0.4; 
+            filter: grayscale(1); 
+            pointer-events: none; 
+            background-color: #f0f0f0 !important;
+        }
+        /* --------------------------- */
+
+        .input-error {
+            border: 2px solid var(--danger-color) !important;
+            box-shadow: 0 0 5px rgba(231, 76, 60, 0.3);
+            background-color: #fff5f5;
+        }
+
+        .swal2-popup { border-radius: 15px !important; padding: 1.5rem !important; }
+
+        @keyframes pulse-generic {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2); }
+            50% { transform: scale(1.02); }
+            70% { box-shadow: 0 0 0 10px rgba(0, 0, 0, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+        }
+
+        .pulse-blue-btn { animation: pulse-generic 2s infinite; background: var(--accent-color) !important; color: white !important; }
+        .pulse-gray-btn { animation: pulse-generic 2s infinite; background: #ddd !important; color: #333 !important; }
+        
+        .pulse-in-green { animation: pulse-generic 2s infinite; box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); }
+        .pulse-in-orange { animation: pulse-generic 2s infinite; box-shadow: 0 0 0 0 rgba(243, 156, 18, 0.7); }
+        .pulse-in-red { animation: pulse-generic 2s infinite; box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+
+        @keyframes pulse-blue {
+            0% { box-shadow: 0 0 0 0 rgba(41, 128, 185, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(41, 128, 185, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(41, 128, 185, 0); }
+        }
+        @keyframes pulse-red-confirm {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); }
+        }
+
+        .filter-tab.active-tab { 
+            background: var(--accent-color); 
+            color: white; 
+            border-color: var(--accent-color);
+            animation: pulse-blue 1.5s infinite;
+        }
+
+        .swal-pulse-confirm { animation: pulse-blue 1.5s infinite !important; }
+        .swal-pulse-cancel { animation: pulse-red-confirm 1.5s infinite !important; }
+
+        .login-screen { position: fixed; inset: 0; background: var(--bg-color); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+        .login-box { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 85%; max-width: 320px; text-align: center; }
+        .pin-input { width: 100%; padding: 12px; margin: 20px 0; border: 2px solid #ddd; border-radius: 12px; font-size: 1.2rem; text-align: center; box-sizing: border-box; transition: border-color 0.3s ease; }
+
+        #mainApp { display: none; width: 100%; justify-content: center; }
+        .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 95%; max-width: 380px; position: relative; }
+        .settings-icon { position: absolute; top: 20px; right: 20px; cursor: pointer; font-size: 22px; color: #95a5a6; }
+        
+        .user-header { text-align: center; margin-bottom: 5px; }
+        .user-name { color: #7f8c8d; font-size: 1rem; margin: 0; }
+        .total-label { color: #95a5a6; font-size: 0.85rem; margin-top: 2px; font-weight: bold; }
+        .total-amount { font-size: 2.3rem; font-weight: 800; color: var(--primary-color); margin: 5px 0; text-align: center; }
+        
+        .modal-balance-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .modal-total-box {
+            font-size: 0.75rem;
+            color: var(--primary-color);
+            font-weight: bold;
+            background: #eafaf1;
+            padding: 4px 8px;
+            border-radius: 8px;
+        }
+
+        .settings-menu { 
+            display: none; 
+            position: absolute; 
+            top: 55px; 
+            right: 20px; 
+            background: white; 
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15); 
+            border-radius: 10px; 
+            z-index: 100; 
+            width: 170px; 
+            border: 1px solid #eee; 
+            overflow: hidden;
+        }
+
+        .settings-scroll-area {
+            max-height: 245px;
+            overflow-y: auto;
+            scrollbar-width: thin;
+        }
+
+        .settings-scroll-area::-webkit-scrollbar {
+            width: 4px;
+        }
+        .settings-scroll-area::-webkit-scrollbar-thumb {
+            background: #ddd;
+            border-radius: 10px;
+        }
+
+        .settings-menu button { 
+            background: none; 
+            border: none; 
+            padding: 12px; 
+            width: 100%; 
+            text-align: right; 
+            cursor: pointer; 
+            border-bottom: 1px solid #eee; 
+            font-family: inherit; 
+            display: block;
+        }
+
+        .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .money-box { background: #fff; border: 1px solid #e0e6ed; border-radius: 12px; padding: 15px; text-align: center; cursor: pointer; font-weight: bold; transition: 0.2s; border: 1px solid #ddd; }
+        .money-box:active { transform: scale(0.95); background: #f0f0f0; }
+
+        .action-row { display: flex; gap: 8px; margin-top: 15px; }
+        .btn-small { flex: 1; padding: 12px; border-radius: 10px; background: #eee; border: 1px solid #ccc; cursor: pointer; font-weight: bold; text-align: center; transition: all 0.3s ease; }
+        
+        @keyframes pulse-green {
+            0% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0.7); transform: scale(1); }
+            50% { box-shadow: 0 0 0 10px rgba(39, 174, 96, 0); transform: scale(1.05); }
+            100% { box-shadow: 0 0 0 0 rgba(39, 174, 96, 0); transform: scale(1); }
+        }
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0.7); transform: scale(1); }
+            50% { box-shadow: 0 0 0 10px rgba(231, 76, 60, 0); transform: scale(1.05); }
+            100% { box-shadow: 0 0 0 0 rgba(231, 76, 60, 0); transform: scale(1); }
+        }
+
+        .active-deposit { background-color: var(--primary-color) !important; color: white !important; border:none; animation: pulse-green 1.5s infinite; }
+        .active-withdraw { background-color: var(--danger-color) !important; color: white !important; border:none; animation: pulse-red 1.5s infinite; }
+
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; }
+        .modal-content { background: white; margin: 3vh auto; width: 95%; max-width: 550px; border-radius: 15px; overflow: hidden; position: relative; }
+        .modal-header { padding: 15px; background: #f8f9fa; display: flex; justify-content: space-between; font-weight: bold; border-bottom: 1px solid #eee;}
+        
+        .log-filter-tabs { display: flex; padding: 10px; background: #fff; gap: 8px; border-bottom: 1px solid #eee; }
+        .filter-tab { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; text-align: center; cursor: pointer; font-size: 0.9rem; font-weight: bold; color: #555; transition: 0.3s; }
+
+        .table-container { max-height: 70vh; overflow-y: auto; padding: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+        th, td { padding: 10px 2px; border-bottom: 1px solid #eee; text-align: center; }
+
+        .admin-form { padding: 15px; background: #f9f9f9; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee; }
+        .admin-form input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; transition: border-color 0.3s ease; }
+        
+        .btn-save-user { border: none; padding: 12px; width: 100%; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.3s; }
+        
+        .edit-cell { position: relative; display: inline-block; padding-left: 5px; }
+        .dot { position: absolute; top: -2px; left: -8px; width: 7px; height: 7px; background-color: var(--warning-color); border-radius: 50%; display: none; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .has-desc .dot { display: block; animation: blink 1s infinite ease-in-out; }
+
+        .single-input-wrapper { display: flex; flex-direction: row-reverse; align-items: center; background: #fff; border: 2px solid #ddd; border-radius: 12px; margin: 10px 0; overflow: hidden; height: 48px; }
+        .single-input-wrapper input { border: none; padding: 10px 15px; flex: 1; outline: none; font-size: 1rem; direction: rtl; font-family: inherit; }
+        .quick-toggle-unit { background: #f0f2f5; min-width: 75px; height: 100%; display: flex; align-items: center; justify-content: center; cursor: pointer; border-right: 2px solid #ddd; user-select: none; }
+        .quick-toggle-unit span { font-weight: 900; color: var(--accent-color); font-size: 0.9rem; }
+        .quick-toggle-unit b { font-size: 0.7rem; margin-right: 4px; color: #888; }
+
+        .return-bar { background: var(--warning-color); color: white; text-align: center; padding: 10px; font-weight: bold; cursor: pointer; display: none; position: fixed; bottom: 0; left: 0; right: 0; z-index: 2000; }
+        
+        .perm-select { padding: 4px; border-radius: 6px; border: 1px solid #ddd; font-size: 0.7rem; background: #fff; cursor: pointer; }
+
+        .cust-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+        .move-btns { display: flex; gap: 5px; }
+        .move-btns button { padding: 5px 8px; border: 1px solid #ddd; background: #fff; border-radius: 5px; cursor: pointer; }
+        .support-msg { color: var(--danger-color); font-size: 0.85rem; margin-top: 10px; display: none; font-weight: bold; }
+
+        .color-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; padding: 10px; max-height: 350px; overflow-y: auto; }
+        .color-box { aspect-ratio: 1; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; cursor: pointer; font-size: 0.8rem; border: 1px solid rgba(0,0,0,0.1); }
+
+        .admin-seen-cell { font-size: 0.65rem; line-height: 1.2; }
+        .admin-seen-cell span { display: block; color: #888; font-size: 0.6rem; }
+        .log-date-full { font-size: 0.6rem; white-space: nowrap; }
+
+        .feature-form { padding: 15px; background: #f9f9f9; border-radius: 10px; margin-bottom: 15px; border: 1px solid #eee; }
+        .feature-form input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+
+        .item-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; background: white; border-radius: 8px; margin-bottom: 8px; }
+        .item-info { flex: 1; }
+        .item-name { font-weight: bold; color: #333; font-size: 0.9rem; }
+        .item-date { font-size: 0.7rem; color: #888; margin-top: 3px; }
+        .item-amount { font-weight: bold; color: var(--primary-color); font-size: 0.95rem; }
+        .item-remaining { font-size: 0.8rem; color: var(--danger-color); margin-top: 3px; }
+        .btn-action { padding: 8px 15px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 0.8rem; transition: 0.3s; }
+        .btn-delete { background: var(--danger-color); color: white; }
+        .btn-pay { background: var(--primary-color); color: white; }
+        .btn-receive { background: var(--accent-color); color: white; }
+    </style>
+</head>
+<body>
+
+<div id="loginScreen" class="login-screen">
+    <div class="login-box">
+        <h3>محفظة</h3>
+        <p>رمز الدخول</p> 
+        <input type="password" id="pinInp" class="pin-input" maxlength="20" placeholder="أدخل الرمز">
+        <button onclick="handleLogin(1)" class="pulse-in-green" style="width:100%; padding:12px; background:var(--primary-color); color:white; border:none; border-radius:10px; font-weight:bold;">دخول</button>
+        <p onclick="showBackup()" style="color:var(--accent-color); margin-top:15px; cursor:pointer;">هل نسيت رمز الدخول؟</p>
+        <p id="registerLink" onclick="showRegister()" style="color:var(--accent-color); margin-top:10px; cursor:pointer; display:none;">هل انت جديد؟</p>
+    </div>
+</div>
+
+<div id="registerScreen" class="login-screen" style="display:none;">
+    <div class="login-box">
+        <h3>محفظة</h3>
+        <p>تسجيل مستخدم جديد</p>
+        <input type="text" id="regName" class="pin-input" placeholder="الاسم" oninput="this.classList.remove('input-error')">
+        <input type="password" id="regPin1" class="pin-input" placeholder="الرمز" maxlength="20" oninput="this.classList.remove('input-error')">
+        <input type="password" id="regPin2" class="pin-input" placeholder="الرمز الاحتياطي" maxlength="20" oninput="this.classList.remove('input-error')">
+        <button id="regBtn" onclick="handleRegister()" class="pulse-in-green" style="width:100%; padding:12px; background:var(--accent-color); color:white; border:none; border-radius:10px; font-weight:bold;">تسجيل</button>
+        <p id="regBackLink" onclick="hideRegister()" style="color:#999; margin-top:15px; cursor:pointer;">العودة للخلف</p>
+    </div>
+</div>
+
+<div id="backupLoginScreen" class="login-screen" style="display:none;">
+    <div class="login-box">
+        <h3>محفظة</h3>
+        <p>الرمز الاحتياطي</p>
+        <input type="password" id="pinInp2" class="pin-input" maxlength="20" placeholder="أدخل الرمز الاحتياطي">
+        <button onclick="handleLogin(2)" class="pulse-in-orange" style="width:100%; padding:12px; background:var(--warning-color); color:white; border:none; border-radius:10px; font-weight:bold;">دخول</button>
+        <p onclick="hideBackup()" style="color:#999; margin-top:15px; cursor:pointer;">العودة للخلف</p>
+        <p onclick="showSupportMsg()" style="color:var(--accent-color); margin-top:10px; cursor:pointer; font-size: 0.9rem;">هل نسيت الرمز الاحتياطي؟</p>
+        <div id="supportMsg" class="support-msg">يرجى التواصل مع فريق الدعم: 92986161</div>
+    </div>
+</div>
+
+<div id="mainApp">
+    <div class="card">
+        <div class="settings-icon" onclick="toggleMenu()">⚙️</div>
+        
+        <div id="mainMenu" class="settings-menu">
+            <div class="settings-scroll-area">
+                <button onclick="openModal('logModal'); renderLogs();">سجل العمليات</button>
+                <button onclick="openModal('invModal'); renderInv();">عدد الفئة</button>
+                <button onclick="openModal('profitModal'); resetProfitCalc();">خسارة و ربح</button>
+                <button onclick="openModal('wishesModal'); renderWishes();" style="color:#9b59b6; font-weight:bold;">رغبات</button>
+                <button onclick="openModal('takenModal'); renderTaken();" style="color:#f39c12; font-weight:bold;">أخذ منك</button>
+                <button onclick="openModal('debtsModal'); renderDebts();" style="color:#e74c3c; font-weight:bold;">ديون</button>
+                <button onclick="openModal('changePinModal')">تغيير رمزي</button>
+                <button id="adminBtn" style="display:none; color:var(--accent-color);" onclick="openModal('adminModal'); renderAdmin();">إدارة المستخدمين</button>
+                <button id="custBtn" style="display:none; color:var(--accent-color); font-weight:bold;" onclick="openModal('custModal'); renderCustList();">تخصيص</button>
+                <button id="toggleRegBtn" style="display:none; color:#9b59b6; font-weight:bold;" onclick="toggleRegistration()">مستخدم جديد : غير مفعل</button>
+                
+                <button id="requestsBtn" style="display:none; color:var(--accent-color); font-weight:bold;" onclick="openModal('requestsModal'); renderRequests();">
+                    طلبات التسجيل <span id="reqAlertMark" class="alert-exclamation">!</span>
+                </button>
+                
+                <button id="autoApproveBtn" style="display:none; color:var(--warning-color); font-weight:bold;" onclick="toggleAutoApprove()">تلقائي: غير مفعل</button>
+                
+                <button onclick="confirmResetWallet()" style="color:var(--danger-color);">تصفير المحفظة</button>
+                <button onclick="location.reload()">تسجيل خروج</button>
+            </div>
+            <button onclick="toggleMenu()" style="color:var(--danger-color); font-weight:bold; border-top: 2px solid #eee; position: sticky; bottom: 0; background: #fff;">إلغاء</button>
+        </div>
+
+        <div class="user-header">
+            <p class="user-name" id="userTitle">محفظة: المستخدم</p>
+            <div class="total-label">الرصيد الإجمالي</div>
+        </div>
+        
+        <div class="total-amount" id="totalDisplay">0.000</div>
+        <div class="grid-container" id="mainGrid"></div>
+        <div class="action-row">
+            <button id="btnDep" class="btn-small" onclick="changeMode('deposit')">تم إيداع</button>
+            <button id="btnWith" class="btn-small" onclick="changeMode('withdraw')">تم خصم</button>
+        </div>
+    </div>
+</div>
+
+<div id="requestsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><span>طلبات التسجيل المعلقة</span><span onclick="closeModal('requestsModal')" style="cursor:pointer">✕</span></div>
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>الاسم</th>
+                        <th>الرمز</th>
+                        <th>الاحتياطي</th>
+                        <th>إجراء</th>
+                    </tr>
+                </thead>
+                <tbody id="requestsBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="returnBar" class="return-bar" onclick="stopRemoteSession()">جاري العرض: اضغط هنا للعودة لحسابك الأصلي</div>
+
+<div id="logModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><span>سجل العمليات</span><span onclick="closeModal('logModal')" style="cursor:pointer">✕</span></div>
+        <div class="log-filter-tabs">
+            <div id="tab-all" class="filter-tab active-tab" onclick="setLogFilter('all')">الكل</div>
+            <div id="tab-deposit" class="filter-tab" onclick="setLogFilter('deposit')">إيداع فقط</div>
+            <div id="tab-withdraw" class="filter-tab" onclick="setLogFilter('withdraw')">خصم فقط</div>
+        </div>
+        <div class="table-container"><table><thead><tr><th>وصف</th><th>اليوم</th><th>التاريخ</th><th>الفئة</th><th>النوع</th><th>المبلغ</th></tr></thead><tbody id="logBody"></tbody></table></div>
+    </div>
+</div>
+
+<div id="profitModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><span>خسارة و ربح</span><span onclick="closeModal('profitModal')" style="cursor:pointer">✕</span></div>
+        <div class="log-filter-tabs">
+            <div id="p-tab-all" class="filter-tab active-tab" onclick="setProfitFilter('all')">الكل</div>
+            <div id="p-tab-deposit" class="filter-tab" onclick="setProfitFilter('deposit')">إيداع فقط</div>
+            <div id="p-tab-withdraw" class="filter-tab" onclick="setProfitFilter('withdraw')">خصم فقط</div>
+        </div>
+        <div class="table-container">
+            <div style="background:#f9f9f9; padding:15px; border-radius:12px; border:1px solid #eee; margin-bottom:10px;">
+                <p style="margin:0 0 10px; font-weight:bold; font-size:0.9rem;">بحث حسب المدة</p>
+                <div class="single-input-wrapper">
+                    <select id="profitPeriod" onchange="calculateProfit()" style="background:#f0f2f5; border:none; height:100%; min-width:85px; font-family:inherit; font-weight:bold; cursor:pointer; text-align:center;">
+                        <option value="day">يوم</option>
+                        <option value="month">شهر</option>
+                        <option value="year">سنة</option>
+                    </select>
+                    <input type="number" id="profitVal" placeholder="أدخل الرقم" oninput="calculateProfit()">
+                </div>
+                <div id="profitResult" style="text-align:center; padding:10px; margin-top:10px; border-radius:8px; font-weight:bold; display:none;"></div>
+            </div>
+            <table><thead><tr><th>اليوم</th><th>التاريخ</th><th>الفئة</th><th>النوع</th><th>المبلغ</th></tr></thead><tbody id="profitBody"></tbody></table>
+        </div>
+    </div>
+</div>
+
+<div id="invModal" class="modal"><div class="modal-content"><div class="modal-header"><span>عدد الفئة</span><span onclick="closeModal('invModal')">✕</span></div><div class="table-container"><table><thead><tr><th>الفئة</th><th>العدد</th><th>الصافي</th></tr></thead><tbody id="invBody"></tbody></table></div></div></div>
+
+<div id="changePinModal" class="modal">
+    <div class="modal-content" style="max-width:320px; padding:20px; text-align:center; margin: 20vh auto;">
+        <h3>تغيير رمز الدخول</h3>
+        <input type="password" id="updPin1" placeholder="أدخل الرمز الجديد" class="pin-input" style="margin:10px 0;">
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button onclick="closeModal('changePinModal')" class="pulse-in-gray" style="flex:1; padding:10px; border:none; border-radius:10px; background:#eee;">إلغاء</button>
+            <button onclick="updateMyPin()" class="pulse-in-green" style="flex:1; padding:10px; border:none; border-radius:10px; background:var(--primary-color); color:white;">تحديث</button>
+        </div>
+    </div>
+</div>
+
+<div id="adminModal" class="modal"><div class="modal-content"><div class="modal-header"><span>إدارة المستخدمين</span><span onclick="closeModal('adminModal')" style="cursor:pointer">✕</span></div><div class="table-container"><div class="admin-form"><p id="formTitle" style="margin:0 0 10px; font-weight:bold;">+ إضافة مستخدم جديد</p><input type="text" id="newName" placeholder="اسم المستخدم">
+    
+    <input type="text" id="newPin1" placeholder="الرمز المطور" oninput="this.classList.remove('input-error')">
+    <input type="text" id="newPin2" placeholder="الرمز الاحتياطي" oninput="this.classList.remove('input-error')">
+    
+    <button class="btn-save-user pulse-blue-btn" id="adminSubmitBtn" onclick="saveUser()">حفظ المستخدم</button>
+    <button id="cancelEditBtn" onclick="resetAdminForm()" class="pulse-gray-btn" style="display:none; width:100%; margin-top:10px; border:none; padding:12px; border-radius:8px; font-weight:bold;">إلغاء</button>
+
+</div><table><thead><tr><th>الاسم</th><th>الرصيد</th><th>آخر ظهور</th><th>الصلاحية</th><th>تعديل</th><th>حذف</th></tr></thead><tbody id="adminBody"></tbody></table></div></div></div>
+
+<div id="custModal" class="modal"><div class="modal-content"><div class="modal-header"><span>تخصيص (عام للجميع)</span><span onclick="closeModal('custModal')" style="cursor:pointer">✕</span></div><div class="table-container">
+    <div style="background:#f9f9f9; padding:15px; border-radius:12px; border:1px solid #eee;">
+        <p style="margin:0; font-weight:bold; font-size:0.9rem;">+ إضافة فئة جديدة للجميع</p>
+        <div class="single-input-wrapper"><div class="quick-toggle-unit" onclick="toggleUnit()"><span id="currentUnit">بيسة</span><b>⇅</b></div><input type="number" id="custValue"></div>
+        <button onclick="addNewCategory()" class="btn-save-user pulse-in-green" style="background:var(--primary-color); color:white;">إضافة للكل</button>
+        <button onclick="deleteAllCats()" class="pulse-in-red" style="width:100%; margin-top:10px; padding:8px; background:none; border:1px dashed var(--danger-color); color:var(--danger-color); border-radius:8px; font-weight:bold; cursor:pointer;">حذف جميع الفئات من الجميع</button>
+    </div>
+    <div id="custListBody" style="margin-top:15px;"></div>
+</div></div></div>
+
+<div id="editNoteModal" class="modal"><div class="modal-content" style="max-width:300px; padding:20px; text-align:center; margin: 20vh auto;"><h3>إضافة ملاحظة</h3><input type="text" id="noteInput" style="width:90%; padding:10px; margin:10px 0; border:1px solid #ddd; border-radius:10px;"><div style="display:flex; gap:10px;"><button onclick="closeModal('editNoteModal')" style="flex:1; padding:10px; border:none; border-radius:10px;">إلغاء</button><button onclick="saveNote()" style="flex:1; padding:10px; border:none; border-radius:10px; background:var(--primary-color); color:white;">حفظ</button></div></div></div>
+
+<div id="wishesModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><span>رغبات</span><span onclick="closeModal('wishesModal')" style="cursor:pointer">✕</span></div>
+        <div class="table-container">
+            <div class="feature-form">
+                <div class="modal-balance-header">
+                    <p style="margin:0; font-weight:bold; font-size:0.8rem;">+ إضافة رغبة جديدة</p>
+                    <div class="modal-total-box">الرصيد الإجمالي: <span class="modal-total-val">0.000</span></div>
+                </div>
+                <input type="text" id="wishName" placeholder="اسم الرغبة">
+                <div class="single-input-wrapper">
+                    <div class="quick-toggle-unit" onclick="toggleWishUnit()">
+                        <span id="wishUnit">بيسة</span><b>⇅</b>
+                    </div>
+                    <input type="number" id="wishAmount" placeholder="المبلغ">
+                </div>
+                <button onclick="addWish()" class="btn-save-user pulse-in-green" style="background:#9b59b6; color:white;">إضافة رغبة</button>
+            </div>
+            <div id="wishesBody"></div>
+        </div>
+    </div>
+</div>
+
+<div id="debtsModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><span>ديون</span><span onclick="closeModal('debtsModal')" style="cursor:pointer">✕</span></div>
+        <div class="table-container">
+            <div class="feature-form">
+                <div class="modal-balance-header">
+                    <p style="margin:0; font-weight:bold; font-size:0.8rem;">+ إضافة دين جديد</p>
+                    <div class="modal-total-box">الرصيد الإجمالي: <span class="modal-total-val">0.000</span></div>
+                </div>
+                <input type="text" id="debtName" placeholder="اسم الدين">
+                <div class="single-input-wrapper">
+                    <div class="quick-toggle-unit" onclick="toggleDebtUnit()">
+                        <span id="debtUnit">بيسة</span><b>⇅</b>
+                    </div>
+                    <input type="number" id="debtAmount" placeholder="المبلغ">
+                </div>
+                <button onclick="addDebt()" class="btn-save-user pulse-in-green" style="background:var(--danger-color); color:white;">إضافة دين</button>
+            </div>
+            <div id="debtsBody"></div>
+        </div>
+    </div>
+</div>
+
+<div id="takenModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header"><span>أخذ منك</span><span onclick="closeModal('takenModal')" style="cursor:pointer">✕</span></div>
+        <div class="table-container">
+            <div class="feature-form">
+                <div class="modal-balance-header">
+                    <p style="margin:0; font-weight:bold; font-size:0.8rem;">+ إضافة مبلغ مأخوذ</p>
+                    <div class="modal-total-box">الرصيد الإجمالي: <span class="modal-total-val">0.000</span></div>
+                </div>
+                <input type="text" id="takenName" placeholder="اسم الشخص">
+                <div class="single-input-wrapper">
+                    <div class="quick-toggle-unit" onclick="toggleTakenUnit()">
+                        <span id="takenUnit">بيسة</span><b>⇅</b>
+                    </div>
+                    <input type="number" id="takenAmount" placeholder="المبلغ">
+                </div>
+                <button onclick="addTaken()" class="btn-save-user pulse-in-green" style="background:var(--warning-color); color:white;">إضافة مبلغ</button>
+            </div>
+            <div id="takenBody"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCD70vCvODz90ItiLAqEm6SpwgZ2RVnW2c",
+        authDomain: "wallet-e0832.firebaseapp.com",
+        projectId: "wallet-e0832",
+        storageBucket: "wallet-e0832.firebasestorage.app",
+        messagingSenderId: "1080828882598",
+        appId: "1:1080828882598:web:e9a6dc78bbda7e3b5bce67",
+        databaseURL: "https://wallet-e0832-default-rtdb.firebaseio.com"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const dbRef = firebase.database().ref('wallets_v1');
+    const settingsRef = firebase.database().ref('settings');
+
+    const presetColors = [];
+    for (let i = 0; i < 100; i++) {
+        const hue = (i * 13.7) % 360; 
+        presetColors.push(`hsl(${hue}, 70%, 55%)`);
+    }
+
+    let db = [];
+    let settings = { showRegistration: false, autoApprove: false, pendingRequests: [] };
+    let user = null;
+    let originalAdmin = null; 
+    let remoteMode = null;    
+    let mode = '';
+    let selectedUnit = 'بيسة';
+    let wishUnit = 'بيسة';
+    let debtUnit = 'بيسة';
+    let takenUnit = 'بيسة';
+    let editingUserIdx = null;
+    let activeLogId = null;
+    let currentLogFilter = 'all';
+    let currentProfitFilter = 'all';
+    let isSubmittingRequest = false; 
+
+    settingsRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data) {
+            settings = data;
+            if (!settings.pendingRequests) settings.pendingRequests = [];
+            
+            // --- تعديل: حذف الطلبات المرفوضة تلقائياً بعد 5 دقائق ---
+            const now = Date.now();
+            const fiveMinutes = 5 * 60 * 1000;
+            let changed = false;
+            
+            settings.pendingRequests = settings.pendingRequests.filter(req => {
+                if (req.status === 'rejected' && req.rejectTimestamp) {
+                    if (now - req.rejectTimestamp > fiveMinutes) {
+                        changed = true;
+                        return false;
+                    }
+                }
+                return true;
+            });
+            
+            if (changed) saveSettings();
+            // -----------------------------------------------------
+        }
+        updateRegisterLinkVisibility();
+        updateAdminButtons();
+        updateAlertMark(); // تحديث علامة التعجب
+        if(document.getElementById('requestsModal').style.display === 'block') renderRequests();
+    });
+
+    // تحديث ظهور علامة التعجب الوامضة
+    function updateAlertMark() {
+        const mark = document.getElementById('reqAlertMark');
+        if(!mark) return;
+        const pendingCount = (settings.pendingRequests || []).filter(r => r.status !== 'rejected').length;
+        mark.style.display = (pendingCount > 0) ? 'inline' : 'none';
+    }
+
+    dbRef.on('value', (snapshot) => {
+        const data = snapshot.val();
+        db = Array.isArray(data) ? data : [];
+        if (user) {
+            const updatedUser = db.find(u => u.pin === user.pin);
+            if(updatedUser){
+                user = updatedUser;
+                updateUI();
+                renderMainGrid();
+                if(document.getElementById('logModal').style.display === 'block') renderLogs();
+                if(document.getElementById('custModal').style.display === 'block') renderCustList();
+                if(document.getElementById('adminModal').style.display === 'block') renderAdmin();
+                if(document.getElementById('profitModal').style.display === 'block') calculateProfit();
+                if(document.getElementById('wishesModal').style.display === 'block') renderWishes();
+                if(document.getElementById('debtsModal').style.display === 'block') renderDebts();
+                if(document.getElementById('takenModal').style.display === 'block') renderTaken();
+            }
+        }
+    });
+
+    function saveDB() { dbRef.set(db); }
+    function saveSettings() { settingsRef.set(settings); }
+
+    function updateRegisterLinkVisibility() {
+        const link = document.getElementById('registerLink');
+        link.style.display = settings.showRegistration ? 'block' : 'none';
+    }
+
+    function updateAdminButtons() {
+        if(user && user.isAdmin) {
+            document.getElementById('requestsBtn').style.display = 'block';
+            document.getElementById('autoApproveBtn').style.display = 'block';
+            document.getElementById('autoApproveBtn').innerText = settings.autoApprove ? 'تلقائي: مفعل' : 'تلقائي: غير مفعل';
+            
+            // التعديل المطلوب: تحديث نص الزر بناءً على الحالة
+            document.getElementById('toggleRegBtn').innerText = settings.showRegistration ? 'مستخدم جديد : مفعل' : 'مستخدم جديد : غير مفعل';
+        }
+    }
+
+    function toggleRegistration() {
+        settings.showRegistration = !settings.showRegistration;
+        saveSettings();
+        const status = settings.showRegistration ? 'مفعّل' : 'غير مفعّل';
+        Swal.fire({ icon: 'success', title: 'تم التحديث', text: `خيار التسجيل للمستخدمين الجدد الآن ${status}`, timer: 1500, showConfirmButton: false });
+    }
+
+    function toggleAutoApprove() {
+        settings.autoApprove = !settings.autoApprove;
+        saveSettings();
+        const status = settings.autoApprove ? 'مفعّل' : 'غير مفعّل';
+        Swal.fire({ icon: 'info', title: 'تحديث', text: `وضع التسجيل التلقائي الآن ${status}`, timer: 1500, showConfirmButton: false });
+    }
+
+    function showRegister() {
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('registerScreen').style.display = 'flex';
+    }
+
+    function hideRegister() {
+        if(isSubmittingRequest) return;
+        document.getElementById('registerScreen').style.display = 'none';
+        document.getElementById('loginScreen').style.display = 'flex';
+        document.getElementById('regName').value = '';
+        document.getElementById('regPin1').value = '';
+        document.getElementById('regPin2').value = '';
+        document.getElementById('regName').classList.remove('input-error');
+        document.getElementById('regPin1').classList.remove('input-error');
+        document.getElementById('regPin2').classList.remove('input-error');
+    }
+
+    function handleRegister() {
+        if (isSubmittingRequest) return;
+        
+        const nameInput = document.getElementById('regName');
+        const pin1Input = document.getElementById('regPin1');
+        const pin2Input = document.getElementById('regPin2');
+        
+        const name = nameInput.value.trim();
+        const pin1 = pin1Input.value.trim();
+        const pin2 = pin2Input.value.trim();
+
+        nameInput.classList.remove('input-error');
+        pin1Input.classList.remove('input-error');
+        pin2Input.classList.remove('input-error');
+
+        if (!name || !pin1) {
+            Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'يجب ادخال الاسم و الرمز' });
+            if (!name) nameInput.classList.add('input-error');
+            if (!pin1) pin1Input.classList.add('input-error');
+            return;
+        }
+
+        const isDuplicate1 = db.some(u => u.pin === pin1);
+        if (isDuplicate1) {
+            pin1Input.classList.add('input-error');
+            Swal.fire({ icon: 'error', title: 'خطأ', text: 'تم استخدام هاذا الرمز من قبل مستخدم اخر يرجاء اختيار رمز اخر' });
+            return;
+        }
+
+        isSubmittingRequest = true;
+        document.getElementById('regBtn').innerText = "جاري الإرسال...";
+
+        const currentCats = (db[0] && db[0].cats) ? JSON.parse(JSON.stringify(db[0].cats)) : [];
+        const newUser = {
+            name: name, pin: pin1, pin2: pin2, isAdmin: false, bal: 0,
+            inv: {}, logs: [], cats: currentCats, permissions: 'control',
+            wishes: [], debts: [], taken: [], status: 'pending' // إضافة الحالة
+        };
+
+        if (settings.autoApprove) {
+            db.push(newUser);
+            dbRef.set(db).then(() => {
+                isSubmittingRequest = false;
+                document.getElementById('regBtn').innerText = "تسجيل";
+                Swal.fire({ icon: 'success', title: 'تم التسجيل بنجاح', text: 'يمكنك الآن تسجيل الدخول', timer: 2000, showConfirmButton: false }).then(() => hideRegister());
+            });
+        } else {
+            if (!settings.pendingRequests) settings.pendingRequests = [];
+            const alreadyPending = settings.pendingRequests.some(r => r.pin === pin1);
+            if(alreadyPending) {
+                isSubmittingRequest = false;
+                document.getElementById('regBtn').innerText = "تسجيل";
+                Swal.fire({ icon: 'info', title: 'طلب مكرر', text: 'لقد أرسلت هذا الطلب مسبقاً، يرجى الانتظار.' });
+                return;
+            }
+            
+            settings.pendingRequests.push(newUser);
+            settingsRef.set(settings).then(() => {
+                isSubmittingRequest = false;
+                document.getElementById('regBtn').innerText = "تسجيل";
+                Swal.fire({ icon: 'info', title: 'طلب معلق', text: 'الرجاء الانتضار حتا يتم الموافقع على التسجيل' }).then(() => hideRegister());
+            });
+        }
+    }
+
+    function renderRequests() {
+        const body = document.getElementById('requestsBody');
+        const reqs = settings.pendingRequests || [];
+        if (reqs.length === 0) {
+            body.innerHTML = "<tr><td colspan='4'>لا توجد طلبات معلقة</td></tr>";
+            return;
+        }
+        
+        body.innerHTML = reqs.map((r, i) => {
+            const isRejected = r.status === 'rejected';
+            return `
+            <tr class="${isRejected ? 'faded-request' : ''}">
+                <td>${r.name}</td>
+                <td>${r.pin}</td>
+                <td>${r.pin2 || '-'}</td>
+                <td>
+                    ${isRejected ? '<span style="color:gray">مرفوض (سيختفي قريباً)</span>' : `
+                        <button onclick="approveRequest(${i})" style="background:var(--primary-color); color:white; border:none; padding:5px 8px; border-radius:5px; cursor:pointer;">موافقة</button>
+                        <button onclick="rejectRequest(${i})" style="background:var(--danger-color); color:white; border:none; padding:5px 8px; border-radius:5px; cursor:pointer;">رفض</button>
+                    `}
+                </td>
+            </tr>
+            `;
+        }).join('');
+    }
+
+    function approveRequest(index) {
+        const req = settings.pendingRequests[index];
+        const newEntry = {...req};
+        delete newEntry.status; // تنظيف الحالة قبل الإضافة
+        db.push(newEntry);
+        settings.pendingRequests.splice(index, 1);
+        saveDB();
+        saveSettings();
+        Swal.fire({ icon: 'success', title: 'تمت الموافقة', timer: 1000, showConfirmButton: false });
+    }
+
+    // --- تعديل وظيفة الرفض: باهت ولمدة 5 دقائق ---
+    function rejectRequest(index) {
+        settings.pendingRequests[index].status = 'rejected';
+        settings.pendingRequests[index].rejectTimestamp = Date.now();
+        saveSettings();
+        updateAlertMark();
+        Swal.fire({ icon: 'error', title: 'تم الرفض', text: 'سيبقى الطلب باهتاً لمدة 5 دقائق ثم يختفي', timer: 1500, showConfirmButton: false });
+    }
+
+    function handleLogin(type) {
+        const inputField = type === 1 ? document.getElementById('pinInp') : document.getElementById('pinInp2');
+        const pinVal = inputField.value.trim();
+        if (pinVal === "") { Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'يرجى إدخل الرمز أولاً' }); return; }
+        const found = db.find(u => type === 1 ? u.pin === pinVal : u.pin2 === pinVal);
+        if (found) {
+            user = found;
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ar-EG');
+            const timeStr = now.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
+            user.lastSeen = dateStr + "|" + timeStr; 
+            saveDB();
+            if(!user.logs) user.logs = [];
+            if(!user.inv) user.inv = {};
+            if(!user.cats) user.cats = [];
+            if(!user.wishes) user.wishes = [];
+            if(!user.debts) user.debts = [];
+            if(!user.taken) user.taken = [];
+            document.querySelectorAll('.login-screen').forEach(s => s.style.display='none');
+            document.getElementById('mainApp').style.display='flex';
+            document.getElementById('userTitle').innerText = "محفظة: " + user.name;
+            if(user.isAdmin) { 
+                document.getElementById('adminBtn').style.display='block'; 
+                document.getElementById('custBtn').style.display='block'; 
+                document.getElementById('toggleRegBtn').style.display='block';
+                updateAdminButtons();
+            }
+            updateUI(); renderMainGrid(); changeMode('deposit');
+            Swal.fire({ icon: 'success', title: 'تم الدخول', timer: 1000, showConfirmButton: false });
+        } else { Swal.fire({ icon: 'error', title: 'الرمز خاطئ', text: 'تأكد من الرمز وحاول مجدداً' }); inputField.value = ''; }
+    }
+
+    function setLogFilter(f) {
+        currentLogFilter = f;
+        document.querySelectorAll('#logModal .filter-tab').forEach(t => t.classList.remove('active-tab'));
+        document.getElementById('tab-' + f).classList.add('active-tab');
+        renderLogs();
+    }
+
+    function setProfitFilter(f) {
+        currentProfitFilter = f;
+        document.querySelectorAll('#profitModal .filter-tab').forEach(t => t.classList.remove('active-tab'));
+        document.getElementById('p-tab-' + f).classList.add('active-tab');
+        calculateProfit();
+    }
+
+    function calculateProfit() {
+        const num = parseFloat(document.getElementById('profitVal').value);
+        const period = document.getElementById('profitPeriod').value;
+        const resultDiv = document.getElementById('profitResult');
+        const body = document.getElementById('profitBody');
+        if (isNaN(num) || num <= 0) { resultDiv.style.display = 'none'; body.innerHTML = ''; return; }
+        const now = new Date();
+        const pastLimit = new Date();
+        if (period === 'day') pastLimit.setDate(now.getDate() - num);
+        else if (period === 'month') pastLimit.setMonth(now.getMonth() - num);
+        else if (period === 'year') pastLimit.setFullYear(now.getFullYear() - num);
+        const limitMs = pastLimit.getTime();
+        let filtered = (user.logs || []).filter(l => l.id >= limitMs);
+        if (currentProfitFilter !== 'all') { filtered = filtered.filter(l => l.type === currentProfitFilter); }
+        let total = 0;
+        filtered.forEach(l => { 
+            let valStr = String(l.val).replace(/[+-]/g, '');
+            let val = parseFloat(valStr);
+            if(l.type === 'deposit') total += val; else total -= val;
+        });
+        resultDiv.style.display = 'block';
+        resultDiv.style.background = total >= 0 ? '#eafaf1' : '#fdf2f2';
+        resultDiv.style.color = total >= 0 ? 'var(--primary-color)' : 'var(--danger-color)';
+        let prefix = "الصافي: ";
+        if (currentProfitFilter === 'deposit') prefix = "إجمالي الإيداعات: ";
+        if (currentProfitFilter === 'withdraw') prefix = "إجمالي الخصومات: ";
+        resultDiv.innerText = prefix + (currentProfitFilter === 'all' ? total.toFixed(3) : Math.abs(total).toFixed(3));
+        body.innerHTML = filtered.map(l => `<tr><td>${l.day}</td><td class="log-date-full">${l.date}</td><td>${l.label}</td><td style="font-weight:bold; color:${l.type==='deposit'?'#27ae60':'#e74c3c'}">${l.tLabel}</td><td style="font-weight:bold; color:${l.type==='deposit'?'#27ae60':'#e74c3c'}">${l.val}</td></tr>`).join('');
+    }
+
+    function resetProfitCalc() { document.getElementById('profitVal').value = ''; setProfitFilter('all'); }
+
+    function renderLogs() {
+        const logs = user.logs || [];
+        const filtered = logs.filter(l => { if(currentLogFilter === 'all') return true; return l.type === currentLogFilter; });
+        document.getElementById('logBody').innerHTML = filtered.map(l => `<tr><td><div class="edit-cell ${l.desc ? 'has-desc' : ''}"><div class="dot"></div><span style="color:var(--accent-color); font-weight:bold; cursor:pointer; text-decoration:underline;" onclick="openEditNote(${l.id})">تحرير</span></div></td><td>${l.day}</td><td class="log-date-full">${l.date}</td><td>${l.label}</td><td style="font-weight:bold; color:${l.type==='deposit'?'#27ae60':'#e74c3c'}">${l.tLabel}</td><td style="font-weight:bold; color:${l.type==='deposit'?'#27ae60':'#e74c3c'}">${l.val}</td></tr>`).join('');
+    }
+
+    function openEditNote(id) { activeLogId = id; const entry = user.logs.find(x => x.id === id); document.getElementById('noteInput').value = entry.desc || ''; openModal('editNoteModal'); }
+
+    function saveUser() { 
+        const nInput = document.getElementById('newName');
+        const p1Input = document.getElementById('newPin1');
+        const p2Input = document.getElementById('newPin2');
+        const p1 = p1Input.value.trim();
+        const p2 = p2Input.value.trim();
+        p1Input.classList.remove('input-error');
+        p2Input.classList.remove('input-error');
+        if(!nInput.value || !p1) { Swal.fire('تنبيه', 'يجب ادخال الاسم و الرمز', 'warning'); return; }
+        const isDuplicate1 = db.some((u, index) => u.pin === p1 && (editingUserIdx === null || index !== editingUserIdx));
+        if(isDuplicate1) { 
+            p1Input.classList.add('input-error');
+            Swal.fire({ icon: 'error', title: 'خطأ', text: 'تم استخدام هاذا الرمز من قبل مستخدم اخر يرجاء اختيار رمز اخر' }); 
+            return; 
+        }
+        if(editingUserIdx !== null) { 
+            db[editingUserIdx].name = nInput.value; 
+            db[editingUserIdx].pin = p1; 
+            db[editingUserIdx].pin2 = p2; 
+        } else { 
+            const currentCats = (db[0] && db[0].cats) ? JSON.parse(JSON.stringify(db[0].cats)) : [];
+            db.push({ name:nInput.value, pin:p1, pin2:p2, isAdmin:false, bal:0, inv:{}, logs:[], cats: currentCats, permissions:'control', wishes:[], debts:[], taken:[] }); 
+        } 
+        saveDB(); resetAdminForm(); renderAdmin(); 
+    }
+
+    function updateMyPin() { 
+        const pInp = document.getElementById('updPin1'); 
+        const p1 = pInp.value.trim();
+        if(!p1) return;
+        if(db.some(u => u !== user && u.pin === p1)) { 
+            Swal.fire({ icon: 'error', title: 'خطأ', text: 'تم استخدام هاذا الرمز من قبل مستخدم اخر يرجاء اختيار رمز اخر' }); 
+            return; 
+        }
+        user.pin = p1; 
+        saveDB(); 
+        closeModal('changePinModal'); 
+        pInp.value = ''; 
+        Swal.fire({ icon: 'success', title: 'تمت العملية', text: 'تم حفظ رمزك الجديد', timer: 2000, showConfirmButton: false });
+    }
+
+    function addMoney(val, label) { 
+        const currentPermission = remoteMode || (user.permissions || 'control');
+        if (currentPermission === 'view' && !user.isAdmin) { Swal.fire({ icon: 'info', title: 'تنبيه', text: 'تم تعيينك للمشاهدة ولا يمكنك التحكم' }); return; }
+        if(!mode || !user) return; 
+        const amt = Math.round(parseFloat(val) * 1000); 
+        if(!user.inv) user.inv = {}; 
+        if(!user.logs) user.logs = []; 
+        let currentBal = Number(user.bal || 0); 
+        if(mode === 'deposit') { user.bal = currentBal + amt; user.inv[label] = (Number(user.inv[label]) || 0) + 1; } 
+        else { user.bal = currentBal - amt; user.inv[label] = (Number(user.inv[label]) || 0) - 1; } 
+        const now = new Date(); 
+        const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']; 
+        const dateStr = now.getDate() + "/" + (now.getMonth()+1) + "/" + now.getFullYear();
+        user.logs.unshift({ 
+            id: Date.now(), 
+            desc: '', 
+            day: days[now.getDay()], 
+            date: dateStr, 
+            label: label, 
+            type: mode, 
+            tLabel: mode === 'deposit' ? 'إيداع' : 'خصم', 
+            val: (mode==='deposit'?'+':'-')+parseFloat(val).toFixed(3) 
+        }); 
+        saveDB(); 
+    }
+
+    function updateUI() { 
+        if(user) { 
+            const formattedBal = (Number(user.bal || 0) / 1000).toFixed(3);
+            document.getElementById('totalDisplay').innerText = formattedBal; 
+            document.querySelectorAll('.modal-total-val').forEach(el => {
+                el.innerText = formattedBal;
+            });
+        } 
+    }
+    
+    function renderMainGrid() { 
+        const grid = document.getElementById('mainGrid');
+        if(!user || !user.cats || user.cats.length === 0) { grid.innerHTML = "<p style='grid-column: span 2; color:#999; text-align:center; padding:40px 0;'>لا توجد فئات حالياً</p>"; return; }
+        grid.innerHTML = user.cats.map(c => `<div class="money-box" style="background:${c.color || '#fff'}" onclick="addMoney(${c.val}, '${c.label}')">${c.label}</div>`).join(''); 
+    }
+
+    function renderAdmin() { 
+        document.getElementById('adminBody').innerHTML = db.map((u, i) => {
+            const seenParts = (u.lastSeen || "-|-").split('|');
+            return `<tr><td style="color:var(--accent-color); font-weight:bold; cursor:pointer;" onclick="startRemoteSession(${i}, 'view')">${u.name}</td><td>${((u.bal || 0)/1000).toFixed(3)}</td><td class="admin-seen-cell">${seenParts[0]}<span>${seenParts[1] || ''}</span></td><td>${u.isAdmin ? 'مدير' : `<select class="perm-select" onchange="updatePerm(${i}, this.value)"><option value="control" ${u.permissions==='control'?'selected':''}>تحكم</option><option value="view" ${u.permissions==='view'?'selected':''}>مشاهدة</option></select>`}</td><td><button style="background:var(--warning-color); color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;" onclick="prepareEdit(${i})">تعديل</button></td><td>${u.isAdmin ? '-' : `<button style="background:var(--danger-color); color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;" onclick="deleteUser(${i})">حذف</button>`}</td></tr>`;
+        }).join('');
+    }
+
+    function startRemoteSession(idx, type) { originalAdmin = user; user = db[idx]; remoteMode = type; document.getElementById('returnBar').style.display = 'block'; document.getElementById('userTitle').innerText = "مشاهدة: " + user.name; closeModal('adminModal'); updateUI(); renderMainGrid(); }
+    
+    function stopRemoteSession() { user = originalAdmin; originalAdmin = null; remoteMode = null; document.getElementById('returnBar').style.display = 'none'; document.getElementById('userTitle').innerText = "محفظة: " + user.name; updateUI(); renderMainGrid(); }
+    
+    function updatePerm(idx, val) { db[idx].permissions = val; saveDB(); }
+    
+    function prepareEdit(i) { editingUserIdx = i; document.getElementById('newName').value = db[i].name; document.getElementById('newPin1').value = db[i].pin; document.getElementById('newPin2').value = db[i].pin2; document.getElementById('formTitle').innerText = "✎ تعديل: " + db[i].name; document.getElementById('adminSubmitBtn').innerText = "تحديث البيانات"; document.getElementById('cancelEditBtn').style.display = "block"; }
+    
+    function resetAdminForm() { editingUserIdx = null; document.getElementById('newName').value = ''; document.getElementById('newPin1').value = ''; document.getElementById('newPin2').value = ''; document.getElementById('formTitle').innerText = "+ إضافة مستخدم جديد"; document.getElementById('adminSubmitBtn').innerText = "حفظ المستخدم"; document.getElementById('cancelEditBtn').style.display = "none"; }
+    
+    function renderInv() { if(!user.cats) return; document.getElementById('invBody').innerHTML = user.cats.map(c => { const count = user.inv ? (Number(user.inv[c.label]) || 0) : 0; return `<tr><td>${c.label}</td><td>${count}</td><td>${(count * parseFloat(c.val)).toFixed(3)}</td></tr>`; }).join(''); }
+    
+    function showColorPicker(idx) { let gridHtml = '<div class="color-grid">'; presetColors.forEach((color, i) => { gridHtml += `<div class="color-box" style="background:${color}" onclick="setCategoryColor(${idx}, '${color}')">${i + 1}</div>`; }); gridHtml += '</div>'; Swal.fire({ title: 'اختر لوناً', html: gridHtml, showDenyButton: true, confirmButtonText: 'إلغاء', denyButtonText: 'اللون الافتراضي' }).then((result) => { if (result.isDenied) setCategoryColor(idx, '#ffffff'); }); }
+    
+    function setCategoryColor(idx, color) { const targetLabel = user.cats[idx].label; db.forEach(u => { if(u.cats) { const c = u.cats.find(x => x.label === targetLabel); if(c) c.color = color; } }); saveDB(); Swal.close(); }
+    
+    function renderCustList() { const list = document.getElementById('custListBody'); if(!user.cats || user.cats.length === 0) { list.innerHTML = "<p style='text-align:center; color:#999;'>لا توجد فئات لعرضها</p>"; return; } list.innerHTML = user.cats.map((c, i) => `<div class="cust-item"><span>${c.label}</span><div class="move-btns"><button onclick="moveCat(${i}, -1)">↑</button><button onclick="moveCat(${i}, 1)">↓</button><button onclick="showColorPicker(${i})" style="background:var(--warning-color); color:white; border:none; padding:5px 10px; border-radius:5px;">لون</button><button onclick="deleteCat(${i})" style="color:red; border-color:red;">حذف</button></div></div>`).join(''); }
+    
+    function deleteAllCats() { Swal.fire({ title: 'حذف جميع الفئات؟', text: "سيتم مسح الفئات من جميع المستخدمين بشكل نهائي!", icon: 'error', showCancelButton: true, confirmButtonColor: '#d33', confirmButtonText: 'نعم، حذف من الكل', cancelButtonText: 'إلغاء' }).then(r => { if(r.isConfirmed){ db.forEach(u => { u.cats = []; }); saveDB(); Swal.fire('تم الحذف', 'تم مسح جميع الفئات من جميع الحسابات', 'success'); } }); }
+    
+    function addNewCategory() { const vInput = document.getElementById('custValue'); if(!vInput.value) return; let num = parseFloat(vInput.value); let val = (selectedUnit === 'بيسة') ? num / 1000 : num; let label = (selectedUnit === 'بيسة') ? num + " بيسة" : num + " ريال"; db.forEach(u => { if(!u.cats) u.cats = []; if (!u.cats.find(c => c.label === label)) { u.cats.push({label: label, val: val, color: '#ffffff'}); } }); saveDB(); vInput.value = ''; }
+    
+    function deleteCat(i) { Swal.fire({title:'حذف الفئة من الجميع؟', icon:'warning', showCancelButton:true, confirmButtonText:'نعم'}).then(r=>{ if(r.isConfirmed){ const targetLabel = user.cats[i].label; db.forEach(u => { if(u.cats) u.cats = u.cats.filter(c => c.label !== targetLabel); }); saveDB(); } }); }
+    
+    function moveCat(i, s) { let ni = i + s; if (ni >= 0 && ni < user.cats.length) { const targetLabel1 = user.cats[i].label; const targetLabel2 = user.cats[ni].label; db.forEach(u => { if(u.cats) { const idx1 = u.cats.findIndex(c => c.label === targetLabel1); const idx2 = u.cats.findIndex(c => c.label === targetLabel2); if(idx1 !== -1 && idx2 !== -1) { [u.cats[idx1], u.cats[idx2]] = [u.cats[idx2], u.cats[idx1]]; } } }); saveDB(); } }
+    
+    function toggleUnit() { selectedUnit = (selectedUnit === 'ريال') ? 'بيسة' : 'ريال'; document.getElementById('currentUnit').innerText = selectedUnit; }
+    function toggleWishUnit() { wishUnit = (wishUnit === 'ريال') ? 'بيسة' : 'ريال'; document.getElementById('wishUnit').innerText = wishUnit; }
+    function toggleDebtUnit() { debtUnit = (debtUnit === 'ريال') ? 'بيسة' : 'ريال'; document.getElementById('debtUnit').innerText = debtUnit; }
+    function toggleTakenUnit() { takenUnit = (takenUnit === 'ريال') ? 'بيسة' : 'ريال'; document.getElementById('takenUnit').innerText = takenUnit; }
+    
+    function changeMode(m) { mode = m; document.getElementById('btnDep').className = 'btn-small' + (m==='deposit'?' active-deposit':''); document.getElementById('btnWith').className = 'btn-small' + (m==='withdraw'?' active-withdraw':''); }
+    
+    function toggleMenu() { const m = document.getElementById('mainMenu'); m.style.display = (m.style.display==='block'?'none':'block'); }
+    
+    function openModal(id) { document.getElementById(id).style.display='block'; if(id!=='editNoteModal') toggleMenu(); updateUI(); }
+    
+    function closeModal(id) { document.getElementById(id).style.display='none'; if(id === 'adminModal') resetAdminForm(); }
+    
+    function showBackup() { document.getElementById('loginScreen').style.display='none'; document.getElementById('backupLoginScreen').style.display='flex'; }
+    
+    function hideBackup() { document.getElementById('backupLoginScreen').style.display='none'; document.getElementById('loginScreen').style.display='flex'; }
+    
+    function showSupportMsg() { document.getElementById('supportMsg').style.display='block'; }
+    
+    function confirmResetWallet() { 
+        const currentPermission = remoteMode || (user.permissions || 'control'); 
+        if (currentPermission === 'view' && !user.isAdmin) { 
+            Swal.fire({ icon: 'info', title: 'تنبيه', text: 'تم تعيينك للمشاهدة ولا يمكنك التحكم' }); 
+            return; 
+        } 
+        
+        Swal.fire({ 
+            title: 'تصفير المحفظة؟', 
+            text: "هل أنت متأكد من تصفير المحفظة؟ ستفقد جميع بياناتك بما في ذلك الرغبات والديون وأخذ منك!", 
+            icon: 'warning', 
+            showCancelButton: true, 
+            confirmButtonColor: '#3085d6', 
+            cancelButtonColor: '#e74c3c', 
+            confirmButtonText: 'نعم', 
+            cancelButtonText: 'إلغاء', 
+            reverseButtons: true,
+            customClass: { 
+                confirmButton: 'swal-pulse-confirm', 
+                cancelButton: 'swal-pulse-cancel' 
+            } 
+        }).then((result) => { 
+            if (result.isConfirmed) { 
+                user.bal = 0; 
+                user.logs = []; 
+                user.inv = {}; 
+                user.wishes = [];
+                user.debts = [];
+                user.taken = [];
+                saveDB(); 
+                toggleMenu(); 
+                Swal.fire({ 
+                    title: 'تم التصفير!', 
+                    text: 'تم مسح كافة البيانات بنجاح.', 
+                    icon: 'success', 
+                    timer: 1500, 
+                    showConfirmButton: false 
+                }); 
+            } 
+        }); 
+    }
+    
+    function deleteUser(i) { Swal.fire({title:'حذف مستخدم؟', icon:'question', showCancelButton:true}).then(r=>{ if(r.isConfirmed){ db.splice(i, 1); saveDB(); renderAdmin(); } }); }
+    
+    function saveNote() { const entry = user.logs.find(x => x.id === activeLogId); if(entry) { entry.desc = document.getElementById('noteInput').value; saveDB(); renderLogs(); closeModal('editNoteModal'); } }
+
+    function addWish() {
+        const currentPermission = remoteMode || (user.permissions || 'control');
+        if (currentPermission === 'view' && !user.isAdmin) { 
+            Swal.fire({ icon: 'info', title: 'تنبيه', text: 'تم تعيينك للمشاهدة ولا يمكنك التحكم' }); 
+            return; 
+        }
+        const name = document.getElementById('wishName').value.trim();
+        const amount = parseFloat(document.getElementById('wishAmount').value);
+        if(!name || !amount || amount <= 0) { Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'يرجى إدخال الاسم والمبلغ' }); return; }
+        const amountInBaisa = (wishUnit === 'بيسة') ? amount : amount * 1000;
+        const now = new Date();
+        const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        const dateStr = now.getDate() + "/" + (now.getMonth()+1) + "/" + now.getFullYear();
+        if(!user.wishes) user.wishes = [];
+        user.wishes.unshift({ id: Date.now(), name: name, amount: amountInBaisa, day: days[now.getDay()], date: dateStr });
+        saveDB();
+        document.getElementById('wishName').value = '';
+        document.getElementById('wishAmount').value = '';
+        Swal.fire({ icon: 'success', title: 'تمت الإضافة', timer: 1000, showConfirmButton: false });
+    }
+
+    function renderWishes() {
+        const body = document.getElementById('wishesBody');
+        if(!user.wishes || user.wishes.length === 0) { body.innerHTML = "<p style='text-align:center; color:#999; padding:20px;'>لا توجد رغبات حالياً</p>"; return; }
+        const currentBal = Number(user.bal || 0);
+        body.innerHTML = user.wishes.map(w => {
+            const remaining = w.amount - currentBal;
+            const amountDisplay = (w.amount / 1000).toFixed(3);
+            let remainingText = '';
+            if (remaining <= 0) {
+                remainingText = `<span style="color: #27ae60; font-weight: bold;">مكتمل</span>`;
+            } else {
+                remainingText = `المتبقي: ${(remaining / 1000).toFixed(3)} ريال`;
+            }
+            return `<div class="item-row"><div class="item-info"><div class="item-name">${w.name}</div><div class="item-date">${w.day} - ${w.date}</div><div class="item-amount">المبلغ: ${amountDisplay} ريال</div><div class="item-remaining">${remainingText}</div></div><button class="btn-action btn-delete" onclick="deleteWish(${w.id})">حذف</button></div>`;
+        }).join('');
+    }
+
+    function deleteWish(id) {
+        const currentPermission = remoteMode || (user.permissions || 'control');
+        if (currentPermission === 'view' && !user.isAdmin) { 
+            Swal.fire({ icon: 'info', title: 'تنبيه', text: 'تم تعيينك للمشاهدة ولا يمكنك التحكم' }); 
+            return; 
+        }
+        Swal.fire({ title: 'حذف الرغبة؟', icon: 'warning', showCancelButton: true, confirmButtonText: 'نعم', cancelButtonText: 'إلغاء' }).then(r => {
+            if(r.isConfirmed) { user.wishes = user.wishes.filter(w => w.id !== id); saveDB(); Swal.fire({ icon: 'success', title: 'تم الحذف', timer: 1000, showConfirmButton: false }); }
+        });
+    }
+
+    function addDebt() {
+        const currentPermission = remoteMode || (user.permissions || 'control');
+        if (currentPermission === 'view' && !user.isAdmin) { 
+            Swal.fire({ icon: 'info', title: 'تنبيه', text: 'تم تعيينك للمشاهدة ولا يمكنك التحكم' }); 
+            return; 
+        }
+        const name = document.getElementById('debtName').value.trim();
+        const amount = parseFloat(document.getElementById('debtAmount').value);
+        if(!name || !amount || amount <= 0) { Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'يرجى إدخال الاسم والمبلغ' }); return; }
+        const amountInBaisa = (debtUnit === 'بيسة') ? amount : amount * 1000;
+        const now = new Date();
+        const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        const dateStr = now.getDate() + "/" + (now.getMonth()+1) + "/" + now.getFullYear();
+        if(!user.debts) user.debts = [];
+        user.debts.unshift({ id: Date.now(), name: name, amount: amountInBaisa, day: days[now.getDay()], date: dateStr });
+        saveDB();
+        document.getElementById('debtName').value = '';
+        document.getElementById('debtAmount').value = '';
+        Swal.fire({ icon: 'success', title: 'تمت الإضافة', timer: 1000, showConfirmButton: false });
+    }
+
+    function renderDebts() {
+        const body = document.getElementById('debtsBody');
+        if(!user.debts || user.debts.length === 0) { body.innerHTML = "<p style='text-align:center; color:#999; padding:20px;'>لا توجد ديون حالياً</p>"; return; }
+        body.innerHTML = user.debts.map(d => {
+            const amountDisplay = (d.amount / 1000).toFixed(3);
+            return `<div class="item-row"><div class="item-info"><div class="item-name">${d.name}</div><div class="item-date">${d.day} - ${d.date}</div><div class="item-amount" style="color:var(--danger-color)">المبلغ: ${amountDisplay} ريال</div></div><button class="btn-action btn-pay" onclick="payDebt(${d.id}, ${d.amount})">سداد</button></div>`;
+        }).join('');
+    }
+
+    function payDebt(id, amount) {
+        const currentPermission = remoteMode || (user.permissions || 'control');
+        if (currentPermission === 'view' && !user.isAdmin) { 
+            Swal.fire({ icon: 'info', title: 'تنبيه', text: 'تم تعيينك للمشاهدة ولا يمكنك التحكم' }); 
+            return; 
+        }
+        const currentBal = Number(user.bal || 0);
+        if(currentBal < amount) { Swal.fire({ icon: 'error', title: 'رصيد غير كافي', text: `رصيدك الحالي: ${(currentBal/1000).toFixed(3)} ريال\nالمبلغ المطلوب: ${(amount/1000).toFixed(3)} ريال` }); return; }
+        Swal.fire({ title: 'سداد الدين؟', text: `سيتم خصم ${(amount/1000).toFixed(3)} ريال من رصيدك`, icon: 'question', showCancelButton: true, confirmButtonText: 'نعم، سداد', cancelButtonText: 'إلغاء' }).then(r => {
+            if(r.isConfirmed) {
+                const debt = user.debts.find(d => d.id === id);
+                user.bal = currentBal - amount;
+                const now = new Date();
+                const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+                const dateStr = now.getDate() + "/" + (now.getMonth()+1) + "/" + now.getFullYear();
+                if(!user.logs) user.logs = [];
+                user.logs.unshift({ id: Date.now(), desc: '', day: days[now.getDay()], date: dateStr, label: 'سداد دين: ' + debt.name, type: 'withdraw', tLabel: 'خصم', val: '-' + (amount/1000).toFixed(3) });
+                user.debts = user.debts.filter(d => d.id !== id);
+                saveDB(); updateUI(); Swal.fire({ icon: 'success', title: 'تم السداد', timer: 1500, showConfirmButton: false });
+            }
+        });
+    }
+
+    function addTaken() {
+        const currentPermission = remoteMode || (user.permissions || 'control');
+        if (currentPermission === 'view' && !user.isAdmin) { 
+            Swal.fire({ icon: 'info', title: 'تنبيه', text: 'تم تعيينك للمشاهدة ولا يمكنك التحكم' }); 
+            return; 
+        }
+        const name = document.getElementById('takenName').value.trim();
+        const amount = parseFloat(document.getElementById('takenAmount').value);
+        if(!name || !amount || amount <= 0) { 
+            Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'يرجى إدخال الاسم والمبلغ' }); 
+            return; 
+        }
+        const amountInBaisa = (takenUnit === 'بيسة') ? amount : amount * 1000;
+        const currentBal = Number(user.bal || 0);
+        if(currentBal < amountInBaisa) { 
+            Swal.fire({ 
+                icon: 'error', 
+                title: 'رصيد غير كافي', 
+                text: `رصيدك الحالي: ${(currentBal/1000).toFixed(3)} ريال\nالمبلغ المطلوب: ${(amountInBaisa/1000).toFixed(3)} ريال` 
+            }); 
+            return; 
+        }
+        const now = new Date();
+        const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        const dateStr = now.getDate() + "/" + (now.getMonth()+1) + "/" + now.getFullYear();
+        if(!user.taken) user.taken = [];
+        user.taken.unshift({ id: Date.now(), name: name, amount: amountInBaisa, day: days[now.getDay()], date: dateStr });
+        user.bal = currentBal - amountInBaisa;
+        if(!user.logs) user.logs = [];
+        user.logs.unshift({ 
+            id: Date.now(), 
+            desc: '', 
+            day: days[now.getDay()], 
+            date: dateStr, 
+            label: 'أخذ منك: ' + name, 
+            type: 'withdraw', 
+            tLabel: 'خصم', 
+            val: '-' + (amountInBaisa/1000).toFixed(3) 
+        });
+        saveDB();
+        updateUI();
+        document.getElementById('takenName').value = '';
+        document.getElementById('takenAmount').value = '';
+        Swal.fire({ icon: 'success', title: 'تمت الإضافة', timer: 1000, showConfirmButton: false });
+    }
+
+    function renderTaken() {
+        const body = document.getElementById('takenBody');
+        if(!user.taken || user.taken.length === 0) { body.innerHTML = "<p style='text-align:center; color:#999; padding:20px;'>لا توجد مبالغ مأخوذة حالياً</p>"; return; }
+        body.innerHTML = user.taken.map(t => {
+            const amountDisplay = (t.amount / 1000).toFixed(3);
+            return `<div class="item-row"><div class="item-info"><div class="item-name">${t.name}</div><div class="item-date">${t.day} - ${t.date}</div><div class="item-amount" style="color:var(--warning-color)">المبلغ: ${amountDisplay} ريال</div></div><button class="btn-action btn-receive" onclick="receiveTaken(${t.id}, ${t.amount})">استرداد</button></div>`;
+        }).join('');
+    }
+
+    function receiveTaken(id, amount) {
+        const currentPermission = remoteMode || (user.permissions || 'control');
+        if (currentPermission === 'view' && !user.isAdmin) { 
+            Swal.fire({ icon: 'info', title: 'تنبيه', text: 'تم تعيينك للمشاهدة ولا يمكنك التحكم' }); 
+            return; 
+        }
+        Swal.fire({ 
+            title: 'استرداد المبلغ؟', 
+            text: `سيتم إضافة ${(amount/1000).toFixed(3)} ريال لرصيدك`, 
+            icon: 'question', 
+            showCancelButton: true, 
+            confirmButtonText: 'نعم، استرداد', 
+            cancelButtonText: 'إلغاء',
+            reverseButtons: true
+        }).then(r => {
+            if(r.isConfirmed) {
+                const taken = user.taken.find(t => t.id === id);
+                const currentBal = Number(user.bal || 0);
+                user.bal = currentBal + amount;
+                const now = new Date();
+                const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+                const dateStr = now.getDate() + "/" + (now.getMonth()+1) + "/" + now.getFullYear();
+                if(!user.logs) user.logs = [];
+                user.logs.unshift({ 
+                    id: Date.now(), 
+                    desc: '', 
+                    day: days[now.getDay()], 
+                    date: dateStr, 
+                    label: 'استرداد من: ' + taken.name, 
+                    type: 'deposit', 
+                    tLabel: 'إيداع', 
+                    val: '+' + (amount/1000).toFixed(3) 
+                });
+                user.taken = user.taken.filter(t => t.id !== id);
+                saveDB(); 
+                updateUI(); 
+                Swal.fire({ icon: 'success', title: 'تم الاسترداد', timer: 1500, showConfirmButton: false });
+            }
+        });
+    }
+
+    // فحص دوري لحذف المرفوضين (كل 10 ثواني كفحص إضافي)
+    setInterval(() => {
+        if(settings && settings.pendingRequests) {
+            const now = Date.now();
+            const fiveMinutes = 5 * 60 * 1000;
+            const initialLength = settings.pendingRequests.length;
+            settings.pendingRequests = settings.pendingRequests.filter(req => {
+                if (req.status === 'rejected' && req.rejectTimestamp) {
+                    return (now - req.rejectTimestamp < fiveMinutes);
+                }
+                return true;
+            });
+            if(settings.pendingRequests.length !== initialLength) {
+                saveSettings();
+            }
+        }
+    }, 10000);
+</script>
+</body>
+</html>
